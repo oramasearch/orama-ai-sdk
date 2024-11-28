@@ -9,20 +9,21 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --dts --format cjs,esm",
+    "build": "tsup",
     "dev": "tsup --watch",
-    "clean": "rm -rf dist"
-  },
-  "dependencies": {
-    "@oramacloud/client": "^1.0.0"
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "ai": "^4.0.0"
+    "ai": "^2.0.0"
   },
   "devDependencies": {
-    "ai": "^4.0.0",
     "@types/node": "^20.0.0",
+    "ai": "^2.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@oramacloud/client": "^2.1.4"
   }
 }

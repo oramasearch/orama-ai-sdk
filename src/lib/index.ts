@@ -1,38 +1,37 @@
 import {
-  generateId,
   loadApiKey,
   withoutTrailingSlash,
 } from '@ai-sdk/provider-utils';
 
-import { OramaChatLanguageModel } from './orama-chat-language-model';
-import type { OramaChatModelId, OramaChatSettings, OramaProviderConfig } from './types';
-
-export type { 
-  OramaConfig,
+import { OramaSearchModel } from './orama-search-model';
+import type {
+  OramaParams,
+  OramaAnswerParams,
   OramaSearchParams,
-  OramaResponse 
-} from './orama-chat-language-model';
+  OramaProviderConfig,
+  OramaAnswerSessionConfig
+} from './types';
 
 export interface OramaProvider {
   (
-    modelId: OramaChatModelId,
-    settings?: OramaChatSettings,
-  ): OramaChatLanguageModel;
+    settings?: OramaParams,
+  ): OramaSearchModel;
 
-  chat(
-    modelId: OramaChatModelId,
-    settings?: OramaChatSettings,
-  ): OramaChatLanguageModel;
+  search(
+    settings?: OramaSearchParams,
+  ): OramaSearchModel;
+
+  answer(
+    settings?: OramaAnswerParams,
+    sessionConfig?: OramaAnswerSessionConfig
+  ): OramaSearchModel;
 }
 
-export interface OramaProviderOptions extends Partial<OramaProviderConfig> {}
-
 export function createOramaProvider(
-  options: OramaProviderOptions = {},
+  options: Partial<OramaProviderConfig> = {},
 ): OramaProvider {
   const createModel = (
-    modelId: OramaChatModelId,
-    settings: OramaChatSettings = {},
+    settings: OramaParams = {},
   ) => {
     const apiKey = loadApiKey({
       apiKey: options.apiKey,
@@ -47,29 +46,46 @@ export function createOramaProvider(
         description: 'Orama Endpoint',
       });
 
-    return new OramaChatLanguageModel({
+    return new OramaSearchModel({
       endpoint,
       apiKey,
+      headers: options.headers,
     });
   };
 
   const provider = function (
-    modelId: OramaChatModelId,
-    settings?: OramaChatSettings,
+    settings?: OramaParams,
   ) {
     if (new.target) {
       throw new Error(
         'The model factory function cannot be called with the new keyword.',
       );
     }
-    return createModel(modelId, settings);
+    return createModel(settings);
   };
 
-  provider.chat = createModel;
+  provider.search = (settings?: OramaSearchParams) => 
+    createModel(settings);
+    
+  provider.answer = (settings?: OramaAnswerParams, sessionConfig?: OramaAnswerSessionConfig) => {
+    const model = createModel(settings);
+    if (sessionConfig) {
+      model.createAnswerSession(sessionConfig);
+    }
+    return model;
+  };
+
   return provider as OramaProvider;
 }
 
 export const oramaProvider = createOramaProvider();
 
-export type { OramaChatModelId, OramaChatSettings, OramaProviderConfig } from './types';
-export { OramaChatLanguageModel };
+export type {
+  OramaParams,
+  OramaAnswerParams,
+  OramaSearchParams,
+  OramaProviderConfig,
+  OramaAnswerSessionConfig,
+} from './types';
+
+export { OramaSearchModel };
