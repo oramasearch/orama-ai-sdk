@@ -1,48 +1,44 @@
-import { Message } from 'ai';
+import type { Message } from 'ai';
 
-export interface OramaBaseParams {
-  signal?: AbortSignal;
-  type?: 'search' | 'answer';
+export interface OramaMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
 }
 
-export interface OramaSearchParams extends OramaBaseParams {
-  limit?: number;
+export interface OramaSearchOptions {
+  mode?: "fulltext" | "vector" | "hybrid";
   where?: Record<string, any>;
+  sortBy?: Array<{ property: string; order?: "asc" | "desc" }>;
+  facets?: Record<string, any>;
+  limit?: number;
   boost?: Record<string, number>;
 }
-
-export interface OramaAnswerParams extends OramaBaseParams {
-  related?: {
-    howMany?: number;
-    format?: 'question' | 'query';
-  };
-  stream?: boolean;
-}
-
-export type OramaParams = OramaSearchParams | OramaAnswerParams;
 
 export interface OramaProviderConfig {
   endpoint: string;
   apiKey: string;
-  headers?: Record<string, string>;
-}
-
-export interface OramaSearchResult {
-  document: Record<string, any>;
-  score: number;
-}
-
-export interface OramaAnswerSessionConfig {
   userContext?: string | Record<string, any>;
-  inferenceType?: 'documentation';
-  initialMessages?: Message[];
+  inferenceType?: "documentation";
+  searchMode?: "fulltext" | "vector" | "hybrid";
+  searchOptions?: {
+    where?: Record<string, any>;
+    sortBy?: Array<{ property: string; order?: "asc" | "desc" }>;
+    facets?: Record<string, any>;
+    limit?: number;
+    boost?: Record<string, number>;
+  };
   events?: {
-    onMessageChange?: (messages: Message[]) => void;
     onMessageLoading?: (loading: boolean) => void;
+    onMessageChange?: (messages: any[]) => void;
     onAnswerAborted?: (aborted: boolean) => void;
     onSourceChange?: (sources: any) => void;
     onQueryTranslated?: (query: any) => void;
     onStateChange?: (state: any) => void;
     onNewInteractionStarted?: (interactionId: string) => void;
   };
+}
+
+export interface OramaStreamResponse extends OramaMessage {
+  createdAt: Date;
 }
