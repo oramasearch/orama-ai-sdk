@@ -1,20 +1,12 @@
-import { OramaClient } from "@oramacloud/client";
-import { OramaService } from './orama-service';
 import type { OramaProviderConfig } from './types';
+import { OramaService } from './orama-service';
 
-export function oramaProvider(config: OramaProviderConfig): OramaService {
+export function createOramaProvider(config: OramaProviderConfig) {
   if (!config.endpoint || !config.apiKey) {
     throw new Error('Endpoint and API Key are required');
   }
 
-  const client = new OramaClient({
-    endpoint: config.endpoint,
-    api_key: config.apiKey,
-  });
-
-  return new OramaService({
-    provider: 'orama.service',
-    client,
-    config,
-  });
+  return new OramaService(config);
 }
+
+export const oramaProvider = createOramaProvider;

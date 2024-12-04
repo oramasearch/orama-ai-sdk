@@ -14,16 +14,13 @@
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit"
   },
-  "peerDependencies": {
-    "ai": "^2.0.0"
-  },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "ai": "^2.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@oramacloud/client": "^2.1.4"
+    "@oramacloud/client": "^2.1.4",
+    "ai": "^4.0.10"
   }
 }

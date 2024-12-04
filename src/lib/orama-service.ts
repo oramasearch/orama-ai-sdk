@@ -1,67 +1,101 @@
 import { OramaClient } from "@oramacloud/client";
-import type { OramaProviderConfig, OramaMessage } from './types';
-
-interface OramaServiceOptions {
-  provider: string;
-  client: OramaClient;
-  config: OramaProviderConfig;
-}
+import type { OramaProviderConfig, SearchResponse, SearchHit, SearchResult } from './types';
 
 export class OramaService {
-  readonly provider: string;
   readonly client: OramaClient;
   readonly config: OramaProviderConfig;
 
-  constructor(options: OramaServiceOptions) {
-    this.provider = options.provider;
-    this.client = options.client;
-    this.config = options.config;
+  constructor(config: OramaProviderConfig) {
+    this.client = new OramaClient({
+      endpoint: config.endpoint,
+      api_key: config.apiKey,
+    });
+    this.config = config;
   }
 
-  async *askStream(messages: OramaMessage[]) {
-    const lastMessage = messages[messages.length - 1];
-    if (!lastMessage?.content) throw new Error('No query provided');
-  
-    const answerSession = this.client.createAnswerSession({
-      userContext: this.config.userContext,
-      inferenceType: this.config.inferenceType || 'documentation',
-      events: this.config.events
-    });
-  
-    try {
-      const answer = await answerSession.askStream({
-        term: lastMessage.content
-      });
-    
-      let text = '';
-      for await (const chunk of answer) {
-        text += chunk;
-        yield {
-          role: 'assistant',
-          content: text
-        };
+  ask() {
+    const self = this;
+    return {
+      doGenerate: async (prompt: any) => {
+        const promptText = prompt.prompt?.[0]?.content?.[0]?.text || prompt;
+        
+        if (this.config.searchMode) {
+          try {
+            const results = await self.client.search({
+              term: promptText,
+              mode: this.config.searchMode,
+              ...this.config.searchOptions
+            }) as SearchResponse;
+
+            if (!results?.hits?.length) {
+              return {
+                text: 'No results found.',
+                results: [],
+                finishReason: 'stop',
+                usage: {
+                  promptTokens: promptText.length,
+                  completionTokens: 'No results found.'.length,
+                  totalTokens: promptText.length + 'No results found.'.length
+                }
+              } as SearchResult;
+            }
+
+            const searchResults = results.hits.map((hit: SearchHit) => ({
+              breed: hit.document.breed,
+              temperament: hit.document.temperament,
+              origin: hit.document.origin,
+              photo: hit.document.photo
+            }));
+
+            const formattedText = searchResults
+              .map((result) => `${result.breed}\nTemperament: ${result.temperament}\nOrigin: ${result.origin}`)
+              .join('\n\n');
+
+            return {
+              text: formattedText,
+              results: searchResults,
+              finishReason: 'stop',
+              usage: {
+                promptTokens: promptText.length,
+                completionTokens: formattedText.length,
+                totalTokens: promptText.length + formattedText.length
+              }
+            } as SearchResult;
+          } catch (error) {
+            console.error('Search error:', error);
+            throw error;
+          }
+        }
+
+        const answerSession = self.client.createAnswerSession({
+          userContext: self.config.userContext,
+          inferenceType: self.config.inferenceType || 'documentation',
+        });
+
+        try {
+          const stream = await answerSession.askStream({
+            term: promptText
+          });
+
+          let text = '';
+          for await (const chunk of stream) {
+            text += chunk;
+          }
+
+          return {
+            text,
+            finishReason: 'stop',
+            usage: {
+              promptTokens: promptText.length,
+              completionTokens: text.length,
+              totalTokens: promptText.length + text.length
+            }
+          };
+        } catch (error) {
+          console.error('Orama error:', error);
+          throw error;
+        }
       }
-    } catch (error) {
-      console.error('Stream error:', error);
-      throw error;
-    }
-  }
-
-  async search(query: string, options: any) {
-    const searchResponse = await this.client.search({
-      term: query,
-      mode: this.config.searchMode || 'hybrid',
-      ...this.config.searchOptions,
-      ...options
-    });
-
-    if (!searchResponse?.hits) {
-      throw new Error('No search results found');
-    }
-
-    return searchResponse.hits.map(hit => ({
-      document: hit.document,
-      score: hit.score
-    }));
+    };
   }
 }

@@ -1,91 +1,86 @@
 'use client';
-import { useState } from 'react';
+import { generateText } from 'ai';
 import { oramaProvider } from 'ai-sdk-orama-provider';
 import { Card, CardContent } from '@/components/ui/card';
 import { Send } from 'lucide-react';
+import { useState } from 'react';
+import Image from 'next/image';
 
-// Create the service instance
-const oramaService = oramaProvider({
-  endpoint: process.env.ORAMA_API_URL!,
-  apiKey: process.env.ORAMA_API_KEY!,
+// Create two providers with different configurations
+const qaProvider = oramaProvider({
+  endpoint: process.env.NEXT_PUBLIC_ORAMA_API_URL!,
+  apiKey: process.env.NEXT_PUBLIC_ORAMA_API_KEY!,
   userContext: "The user is looking for documentation help",
-  inferenceType: "documentation",
-  events: {
-    onMessageLoading: (loading) => {
-      console.log('Loading:', loading);
-    },
-    onMessageChange: (messages) => {
-      console.log('Messages changed:', messages);
-    }
+  inferenceType: "documentation"
+});
+
+const searchProvider = oramaProvider({
+  endpoint: process.env.NEXT_PUBLIC_ORAMA_SEARCH_API_URL!,
+  apiKey: process.env.NEXT_PUBLIC_ORAMA_SEARCH_API_KEY!,
+  searchMode: "fulltext",
+  searchOptions: {
+    limit: 5
   }
 });
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<'chat' | 'search'>('chat');
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userMessage = {
-      role: 'user',
-      content: input
-    };
-
-    setMessages(prevMessages => [...prevMessages, userMessage]);
+    setMessages(prev => [...prev, { role: 'user', content: input }]);
     setInput('');
     setIsLoading(true);
 
     try {
-      const assistantMessage = {
-        role: 'assistant',
-        content: ''
-      };
-      
-      setMessages(prevMessages => [...prevMessages, assistantMessage]);
-
-      let accumulatedText = '';
-      for await (const { content } of oramaService.askStream([...messages, userMessage])) {
-        accumulatedText += content;
-        setMessages(prevMessages => {
-          const newMessages = [...prevMessages];
-          newMessages[newMessages.length - 1].content = accumulatedText;
-          return newMessages;
-        });
-      }
-    } catch (error) {
-      console.error('Error during chat:', error);
-      setMessages(prevMessages => {
-        const newMessages = [...prevMessages];
-        newMessages[newMessages.length - 1].content = 
-          'Sorry, I encountered an error while processing your request.';
-        return newMessages;
+      const response = await generateText({
+        model: activeTab === 'chat' ? qaProvider.ask() : searchProvider.ask(),
+        prompt: input
       });
+
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: response.text,
+        results: response.results 
+      }]);
+    } catch (error) {
+      console.error('Error:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Example of how to use search independently
-  const handleSearch = async (searchTerm: string) => {
-    try {
-      const results = await oramaService.search(searchTerm, {
-        limit: 5
-      });
-      // Handle search results as needed
-      console.log('Search results:', results);
-    } catch (error) {
-      console.error('Error during search:', error);
     }
   };
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 p-4">
       <div className="mb-4">
-        <h1 className="text-3xl font-bold text-gray-900">Documentation Assistant</h1>
-        <p className="text-gray-600">Ask me anything about the documentation!</p>
+        <h1 className="text-3xl font-bold text-gray-900">Data Assistant</h1>
+        <div className="flex space-x-4 mt-2">
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`px-4 py-2 rounded-lg ${
+              activeTab === 'chat' 
+                ? 'bg-blue-500 text-white' 
+                : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            Chat
+          </button>
+          <button
+            onClick={() => setActiveTab('search')}
+            className={`px-4 py-2 rounded-lg ${
+              activeTab === 'search' 
+                ? 'bg-blue-500 text-white' 
+                : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            Search
+          </button>
+        </div>
       </div>
 
       <Card className="flex-1 mb-4 overflow-hidden">
@@ -104,14 +99,26 @@ export default function Home() {
                 <div className="whitespace-pre-wrap">
                   {message.content}
                 </div>
+                {message.results && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                    {message.results.map((result, idx) => (
+                      <div key={idx} className="border rounded-lg p-4">
+                        <Image
+                          src={result.photo}
+                          alt={result.breed}
+                          width={300}
+                          height={200}
+                          className="rounded-lg object-cover w-full h-48"
+                        />
+                        <h3 className="font-semibold mt-2">{result.breed}</h3>
+                        <p className="text-sm text-gray-600">{result.temperament}</p>
+                        <p className="text-sm text-gray-500">Origin: {result.origin}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
-            {isLoading && (
-              <div className="p-4 rounded-lg bg-blue-50">
-                <div className="font-semibold mb-1">Assistant:</div>
-                <div className="animate-pulse">Thinking...</div>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -120,7 +127,7 @@ export default function Home() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about the documentation..."
+          placeholder={activeTab === 'chat' ? "Ask about the documentation..." : "Search for dog breeds..."}
           className="flex-1 p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={isLoading}
         />
