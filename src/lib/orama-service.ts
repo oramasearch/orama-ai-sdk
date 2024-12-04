@@ -41,14 +41,16 @@ export class OramaService {
             }
 
             const searchResults = results.hits.map((hit: SearchHit) => ({
-              breed: hit.document.breed,
-              temperament: hit.document.temperament,
-              origin: hit.document.origin,
-              photo: hit.document.photo
+              document: hit.document,
+              score: hit.score
             }));
 
             const formattedText = searchResults
-              .map((result) => `${result.breed}\nTemperament: ${result.temperament}\nOrigin: ${result.origin}`)
+              .map((result) => {
+                return Object.entries(result.document)
+                  .map(([key, value]) => `${key}: ${value}`)
+                  .join('\n');
+              })
               .join('\n\n');
 
             return {

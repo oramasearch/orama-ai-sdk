@@ -2,11 +2,9 @@
 import { generateText } from 'ai';
 import { oramaProvider } from 'ai-sdk-orama-provider';
 import { Card, CardContent } from '@/components/ui/card';
-import { Send } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Image from 'next/image';
 
-// Create two providers with different configurations
 const qaProvider = oramaProvider({
   endpoint: process.env.NEXT_PUBLIC_ORAMA_API_URL!,
   apiKey: process.env.NEXT_PUBLIC_ORAMA_API_KEY!,
@@ -23,11 +21,43 @@ const searchProvider = oramaProvider({
   }
 });
 
+const ResultCard = ({ document }: { document: Record<string, any> }) => {
+  return (
+    <div className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm">
+      {document.photo && (
+        <div className="mb-3">
+          <Image
+            src={document.photo}
+            alt={`Image for ${document.breed || 'result'}`}
+            width={300}
+            height={200}
+            className="rounded-lg object-cover w-full h-48"
+            style={{ width: 'auto', height: 'auto' }}
+          />
+        </div>
+      )}
+      <div className="space-y-2">
+        {Object.entries(document).map(([key, value]) => {
+          if (key === 'photo') return null;
+          
+          return (
+            <div key={key} className="text-sm">
+              <span className="font-medium text-gray-700 capitalize">{key.replace(/_/g, ' ')}: </span>
+              <span className="text-gray-600">{value.toString()}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'chat' | 'search'>('chat');
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,75 +75,66 @@ export default function Home() {
 
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: response.text,
-        results: response.results 
+        content: activeTab === 'chat' ? response.text : '',
+        results: activeTab === 'search' ? parseResults(response.text) : null
       }]);
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setIsLoading(false);
+      inputRef.current?.focus();
     }
   };
 
+  const parseResults = (text: string) => {
+    const entries = text.split('\n\n').map(entry => {
+      const fields = entry.split('\n').reduce((acc, line) => {
+        const [key, value] = line.split(': ');
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>);
+      return { document: fields };
+    });
+    return { hits: entries };
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50 p-4">
-      <div className="mb-4">
-        <h1 className="text-3xl font-bold text-gray-900">Data Assistant</h1>
-        <div className="flex space-x-4 mt-2">
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`px-4 py-2 rounded-lg ${
-              activeTab === 'chat' 
-                ? 'bg-blue-500 text-white' 
-                : 'bg-gray-200 text-gray-700'
-            }`}
-          >
-            Chat
-          </button>
-          <button
-            onClick={() => setActiveTab('search')}
-            className={`px-4 py-2 rounded-lg ${
-              activeTab === 'search' 
-                ? 'bg-blue-500 text-white' 
-                : 'bg-gray-200 text-gray-700'
-            }`}
-          >
-            Search
-          </button>
-        </div>
+    <div className="flex flex-col min-h-screen max-w-6xl mx-auto bg-white p-4 md:p-8">
+      <div className="mb-8">
+        <Image
+          src="https://website-assets.oramasearch.com/orama-when-light.svg"
+          alt="Orama Logo"
+          width={150}
+          height={40}
+          className="mb-2"
+          priority
+        />
       </div>
 
-      <Card className="flex-1 mb-4 overflow-hidden">
-        <CardContent className="h-full overflow-y-auto p-4">
-          <div className="space-y-4">
+      <Card className="flex-1 mb-4 overflow-hidden border rounded-xl shadow-sm">
+        <CardContent className="h-[calc(100vh-250px)] overflow-y-auto p-6">
+          <div className="space-y-6">
             {messages.map((message, index) => (
               <div 
                 key={index} 
-                className={`p-4 rounded-lg ${
-                  message.role === 'assistant' ? 'bg-blue-50' : 'bg-gray-50'
+                className={`p-4 rounded-xl ${
+                  message.role === 'assistant' 
+                    ? 'bg-[#F9F5FF] border border-[#EEE9F6]' 
+                    : 'bg-white border border-gray-100'
                 }`}
               >
-                <div className="font-semibold mb-1">
-                  {message.role === 'assistant' ? 'Assistant' : 'You'}:
+                <div className="font-medium text-gray-700 mb-2">
+                  {message.role === 'assistant' ? 'Assistant' : 'You'}
                 </div>
-                <div className="whitespace-pre-wrap">
-                  {message.content}
-                </div>
-                {message.results && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                    {message.results.map((result, idx) => (
-                      <div key={idx} className="border rounded-lg p-4">
-                        <Image
-                          src={result.photo}
-                          alt={result.breed}
-                          width={300}
-                          height={200}
-                          className="rounded-lg object-cover w-full h-48"
-                        />
-                        <h3 className="font-semibold mt-2">{result.breed}</h3>
-                        <p className="text-sm text-gray-600">{result.temperament}</p>
-                        <p className="text-sm text-gray-500">Origin: {result.origin}</p>
-                      </div>
+                {message.content && (
+                  <div className="text-gray-600 whitespace-pre-wrap mb-4">
+                    {message.content}
+                  </div>
+                )}
+                {message.results?.hits && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {message.results.hits.map((hit, idx) => (
+                      <ResultCard key={idx} document={hit.document} />
                     ))}
                   </div>
                 )}
@@ -123,20 +144,33 @@ export default function Home() {
         </CardContent>
       </Card>
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={activeTab === 'chat' ? "Ask about the documentation..." : "Search for dog breeds..."}
-          className="flex-1 p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          disabled={isLoading}
-        />
+      <form onSubmit={handleSubmit} className="flex gap-3">
+        <div className="flex-1 relative flex items-center">
+          <div className="absolute left-3 flex items-center border-r border-gray-200 pr-3">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value as 'chat' | 'search')}
+              className="bg-transparent text-gray-600 focus:ring-0 cursor-pointer border-none text-sm font-medium py-2 pl-1 pr-8"
+            >
+              <option value="chat">Chat</option>
+              <option value="search">Search</option>
+            </select>
+          </div>
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask or search about your data..."
+            className="flex-1 p-4 pl-32 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#EEE9F6] focus:border-transparent"
+            disabled={isLoading}
+          />
+        </div>
         <button 
           type="submit" 
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-4 bg-[#8152EE] text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={isLoading || !input.trim()}
         >
-          <Send className="w-4 h-4" />
+          →
         </button>
       </form>
     </div>

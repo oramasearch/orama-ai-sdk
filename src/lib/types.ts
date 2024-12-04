@@ -16,13 +16,8 @@ export interface OramaProviderConfig {
 }
 
 export interface SearchHit {
-  document: {
-    breed: string;
-    temperament: string;
-    origin: string;
-    photo: string;
-    [key: string]: any;
-  };
+  document: Record<string, any>;
+  score: number;
 }
 
 export interface SearchResponse {
@@ -31,12 +26,7 @@ export interface SearchResponse {
 
 export interface SearchResult {
   text: string;
-  results?: Array<{
-    breed: string;
-    temperament: string;
-    origin: string;
-    photo: string;
-  }>;
+  results?: any;
   finishReason: string;
   usage: {
     promptTokens: number;
