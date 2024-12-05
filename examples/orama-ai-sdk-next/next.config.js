@@ -7,7 +7,7 @@ const nextConfig = {
   transpilePackages: ['ai-sdk-orama-provider'],
   images: {
     domains: ['website-assets.oramasearch.com',
-      'learnwebcode.github.io'],
+      'pub-63f27474fef34587a26f8ec7f626984d.r2.dev'],
   },
 }
 

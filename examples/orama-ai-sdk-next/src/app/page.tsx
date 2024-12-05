@@ -5,30 +5,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 
-const qaProvider = oramaProvider({
-  endpoint: process.env.NEXT_PUBLIC_ORAMA_API_URL!,
-  apiKey: process.env.NEXT_PUBLIC_ORAMA_API_KEY!,
-  userContext: "The user is looking for documentation help",
-  inferenceType: "documentation"
-});
-
-const searchProvider = oramaProvider({
-  endpoint: process.env.NEXT_PUBLIC_ORAMA_SEARCH_API_URL!,
-  apiKey: process.env.NEXT_PUBLIC_ORAMA_SEARCH_API_KEY!,
-  searchMode: "fulltext",
-  searchOptions: {
-    limit: 5
-  }
-});
-
 const ResultCard = ({ document }: { document: Record<string, any> }) => {
   return (
     <div className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm">
-      {document.photo && (
+      {document.image && (
         <div className="mb-3">
           <Image
-            src={document.photo}
-            alt={`Image for ${document.breed || 'result'}`}
+            src={document.image}
+            alt={`Image for ${document.title || 'result'}`}
             width={300}
             height={200}
             className="rounded-lg object-cover w-full h-48"
@@ -37,16 +21,42 @@ const ResultCard = ({ document }: { document: Record<string, any> }) => {
         </div>
       )}
       <div className="space-y-2">
-        {Object.entries(document).map(([key, value]) => {
-          if (key === 'photo') return null;
-          
-          return (
-            <div key={key} className="text-sm">
-              <span className="font-medium text-gray-700 capitalize">{key.replace(/_/g, ' ')}: </span>
-              <span className="text-gray-600">{value.toString()}</span>
-            </div>
-          );
-        })}
+        {document.title && (
+          <div className="text-sm">
+            <span className="font-medium text-gray-700 capitalize">Title: </span>
+            <span className="text-gray-600">{document.title}</span>
+          </div>
+        )}
+        {document.releaseDate && (
+          <div className="text-sm">
+            <span className="font-medium text-gray-700 capitalize">Release Date: </span>
+            <span className="text-gray-600">{new Date(document.releaseDate).toLocaleDateString()}</span>
+          </div>
+        )}
+        {document.rating && (
+          <div className="text-sm">
+            <span className="font-medium text-gray-700 capitalize">Rating: </span>
+            <span className="text-gray-600">{document.rating}</span>
+          </div>
+        )}
+        {document.genres && Array.isArray(document.genres) && (
+          <div className="text-sm">
+            <span className="font-medium text-gray-700 capitalize">Genres: </span>
+            <span className="text-gray-600">{document.genres.join(', ')}</span>
+          </div>
+        )}
+        {document.description && (
+          <div className="text-sm">
+            <span className="font-medium text-gray-700 capitalize">Description: </span>
+            <span className="text-gray-600">{document.description}</span>
+          </div>
+        )}
+        {document.url && (
+          <div className="text-sm">
+            <span className="font-medium text-gray-700 capitalize">URL: </span>
+            <a href={document.url} className="text-blue-600 underline">{document.url}</a>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -68,8 +78,21 @@ export default function Home() {
     setIsLoading(true);
 
     try {
+      const provider = oramaProvider({
+        endpoint: process.env.NEXT_PUBLIC_ORAMA_API_URL!,
+        apiKey: process.env.NEXT_PUBLIC_ORAMA_API_KEY!,
+        userContext: "The user is looking for documentation help",
+        inferenceType: "documentation",
+        ...(activeTab === 'search' && {
+          searchMode: "fulltext",
+          searchOptions: {
+            limit: 5
+          }
+        })
+      });
+
       const response = await generateText({
-        model: activeTab === 'chat' ? qaProvider.ask() : searchProvider.ask(),
+        model: provider.ask(),
         prompt: input
       });
 
