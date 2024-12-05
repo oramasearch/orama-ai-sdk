@@ -97,6 +97,48 @@ export class OramaService {
           console.error('Orama error:', error);
           throw error;
         }
+      },
+
+      doStream: async (prompt: any) => {
+        const promptText = prompt.prompt?.[0]?.content?.[0]?.text || prompt;
+        
+        const answerSession = self.client.createAnswerSession({
+          userContext: self.config.userContext,
+          inferenceType: self.config.inferenceType || 'documentation',
+        });
+
+        try {
+          const generator = await answerSession.askStream({
+            term: promptText
+          });
+
+          return {
+            stream: new ReadableStream({
+              async start(controller) {
+                let accumulatedText = '';
+                try {
+                  for await (const chunk of generator) {
+                    accumulatedText += chunk;
+                    controller.enqueue({ type: 'text-delta', textDelta: accumulatedText });
+                  }
+                  controller.enqueue({
+                    type: 'finish',
+                    finishReason: 'stop',
+                    logprobs: undefined,
+                    usage: { completionTokens: 10, promptTokens: 3 },
+                  });
+                  controller.close();
+                } catch (e) {
+                  controller.error(e);
+                }
+              }
+            }),
+            rawCall: { rawPrompt: promptText, rawSettings: {} },
+          };
+        } catch (error) {
+          console.error('Orama error:', error);
+          throw error;
+        }
       }
     };
   }
