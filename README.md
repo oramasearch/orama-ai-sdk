@@ -29,7 +29,7 @@ yarn add ai-sdk-orama-provider
 
 ## Quick Start
 
-```
+```js
 import { generateText } from 'ai';
 import { oramaProvider } from 'ai-sdk-orama-provider';
 
@@ -67,7 +67,7 @@ export default function Chat() {
 
 ### Provider Configuration
 
-```
+```js
 interface OramaProviderConfig {
   endpoint: string;    // Your Orama endpoint URL
   apiKey: string;      // Your Orama API key
@@ -80,7 +80,7 @@ interface OramaProviderConfig {
 
 ### Search Options
 
-```
+```js
 interface OramaSearchOptions {
   mode?: "fulltext" | "vector" | "hybrid";
   where?: Record<string, any>;
@@ -97,7 +97,7 @@ interface OramaSearchOptions {
 
 ### Chat/QA Mode
 
-```
+```js
 const orama = oramaProvider({
   endpoint: process.env.ORAMA_API_URL!,
   apiKey: process.env.ORAMA_API_KEY!,
@@ -112,7 +112,7 @@ const { text } = await generateText({
 
 ### Search Mode
 
-```
+```js
 const orama = oramaProvider({
   endpoint: process.env.ORAMA_API_URL!,
   apiKey: process.env.ORAMA_API_KEY!,
@@ -138,4 +138,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT
+Apache 2.0. Read the full license [here](/LICENSE.md)
