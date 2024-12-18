@@ -14,18 +14,7 @@ A provider for [Vercel's AI SDK](https://sdk.vercel.ai/docs) that enables seamle
 
 ```
 npm install ai-sdk-orama-provider
-
 ```
-or
-```
-pnpm install ai-sdk-orama-provider
-```
-or
-
-```
-yarn add ai-sdk-orama-provider
-```
-
 
 ## Quick Start
 
