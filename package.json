@@ -1,5 +1,5 @@
 {
-  "name": "ai-sdk-orama-provider",
+  "name": "@orama/ai-sdk-provider",
   "version": "0.1.0",
   "description": "Orama provider for Vercel AI SDK",
   "main": "./dist/index.js",

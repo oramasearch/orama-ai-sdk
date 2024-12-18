@@ -1,6 +1,6 @@
 'use client';
 import { generateText } from 'ai';
-import { oramaProvider } from 'ai-sdk-orama-provider';
+import { oramaProvider } from '@orama/ai-sdk-provider';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState, useRef } from 'react';
 import Image from 'next/image';

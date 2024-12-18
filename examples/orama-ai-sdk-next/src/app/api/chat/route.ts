@@ -1,5 +1,4 @@
-import { oramaProvider } from 'ai-sdk-orama-provider';
-import { StreamingTextResponse } from 'ai-sdk-orama-provider';
+import { oramaProvider } from '@orama/ai-sdk-provider';
 
 export const runtime = 'edge';
 
