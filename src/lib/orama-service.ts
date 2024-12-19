@@ -68,37 +68,7 @@ export class OramaService {
             throw error;
           }
         }
-
-        const answerSession = self.client.createAnswerSession({
-          userContext: self.config.userContext,
-          inferenceType: self.config.inferenceType || 'documentation',
-        });
-
-        try {
-          const stream = await answerSession.askStream({
-            term: promptText
-          });
-
-          let text = '';
-          for await (const chunk of stream) {
-            text += chunk;
-          }
-
-          return {
-            text,
-            finishReason: 'stop',
-            usage: {
-              promptTokens: promptText.length,
-              completionTokens: text.length,
-              totalTokens: promptText.length + text.length
-            }
-          };
-        } catch (error) {
-          console.error('Orama error:', error);
-          throw error;
-        }
       },
-
       doStream: async (prompt: any) => {
         const promptText = prompt.prompt?.[0]?.content?.[0]?.text || prompt;
         
@@ -108,35 +78,58 @@ export class OramaService {
         });
 
         try {
-          const generator = await answerSession.askStream({
+          const oramaStream = await answerSession.askStream({
             term: promptText
           });
 
-          return {
-            stream: new ReadableStream({
-              async start(controller) {
-                let accumulatedText = '';
-                try {
-                  for await (const chunk of generator) {
-                    accumulatedText += chunk;
-                    controller.enqueue({ type: 'text-delta', textDelta: accumulatedText });
+          const stream = new ReadableStream({
+            async start(controller) {
+              try {
+                for await (const chunk of oramaStream) {
+                  if (chunk != null) {
+                    controller.enqueue({
+                      type: 'text-delta',
+                      textDelta: chunk.toString()
+                    });
                   }
-                  controller.enqueue({
-                    type: 'finish',
-                    finishReason: 'stop',
-                    logprobs: undefined,
-                    usage: { completionTokens: 10, promptTokens: 3 },
-                  });
-                  controller.close();
-                } catch (e) {
-                  controller.error(e);
                 }
+                controller.enqueue({
+                  type: 'finish',
+                  finishReason: 'stop',
+                  usage: {
+                    promptTokens: promptText.length,
+                    completionTokens: 0,
+                    totalTokens: promptText.length
+                  }
+                });
+                controller.close();
+              } catch (error) {
+                console.error('Stream processing error:', error);
+                controller.enqueue({
+                  type: 'error',
+                  error
+                });
+                controller.error(error);
+              }
+            }
+          });
+
+          return {
+            stream,
+            response: Promise.resolve({
+              id: 'orama-response',
+              created: Date.now(),
+              model: 'orama',
+              usage: {
+                promptTokens: promptText.length,
+                completionTokens: 0,
+                totalTokens: promptText.length
               }
             }),
-            rawCall: { rawPrompt: promptText, rawSettings: {} },
+            data: Promise.resolve({ id: 'orama-data' })
           };
         } catch (error) {
-          console.error('Orama error:', error);
+          console.error('Orama streaming error:', error);
           throw error;
         }
       }

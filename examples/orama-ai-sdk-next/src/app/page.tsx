@@ -1,8 +1,8 @@
 'use client';
-import { generateText } from 'ai';
+import { generateText, streamText } from 'ai';
 import { oramaProvider } from '@orama/ai-sdk-provider';
 import { Card, CardContent } from '@/components/ui/card';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 
 const ResultCard = ({ document }: { document: Record<string, any> }) => {
@@ -67,20 +67,33 @@ export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  const [currentStreamingMessage, setCurrentStreamingMessage] = useState('');
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, currentStreamingMessage])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
-
+  
     setMessages(prev => [...prev, { role: 'user', content: input }]);
+    
+    setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+    
     setInput('');
     setIsLoading(true);
-
+  
     try {
       const provider = oramaProvider({
-        endpoint: process.env.NEXT_PUBLIC_ORAMA_API_URL!,
-        apiKey: process.env.NEXT_PUBLIC_ORAMA_API_KEY!,
+        endpoint: process.env.NEXT_PUBLIC_ORAMA_API_URL,
+        apiKey: process.env.NEXT_PUBLIC_ORAMA_API_KEY,
         userContext: "The user is looking for documentation help",
         inferenceType: "documentation",
         ...(activeTab === 'search' && {
@@ -90,19 +103,54 @@ export default function Home() {
           }
         })
       });
-
-      const response = await generateText({
-        model: provider.ask(),
-        prompt: input
-      });
-
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: activeTab === 'chat' ? response.text : '',
-        results: activeTab === 'search' ? parseResults(response.text) : null
-      }]);
+  
+      if (activeTab === 'chat') {
+        try {
+          const response = await streamText({
+            model: provider.ask(),
+            prompt: input,
+            temperature: 0
+          });
+  
+          let previousLength = 0;
+          for await (const chunk of response.textStream) {
+            if (chunk) {
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                const currentChunk = chunk.toString();
+                const newText = currentChunk.slice(previousLength);
+                previousLength = currentChunk.length;
+                lastMessage.content += newText;
+                return newMessages;
+              });
+            }
+          }
+        } catch (streamError) {
+          console.error('Streaming error:', streamError);
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1].content = 'Sorry, there was an error processing your request.';
+            return newMessages;
+          });
+        }
+      } else {
+        const response = await generateText({
+          model: provider.ask(),
+          prompt: input
+        });
+  
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          results: activeTab === 'search' ? parseResults(response.text) : null
+        }]);
+      }
     } catch (error) {
-      console.error('Error:', error);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1].content = 'An error occurred while processing your request.';
+        return newMessages;
+      });
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
