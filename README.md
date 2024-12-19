@@ -18,14 +18,14 @@ npm install @orama/ai-sdk-provider
 
 ## Quick Start
 
-```js
-import { generateText } from 'ai';
+```jsx
+import { generateText, streamText } from 'ai';
 import { oramaProvider } from '@orama/ai-sdk-provider';
 
 // Create an Orama provider instance
-const orama = oramaProvider({
-  endpoint: process.env.ORAMA_API_URL!,
-  apiKey: process.env.ORAMA_API_KEY!,
+const provider = oramaProvider({
+  endpoint: process.env.ORAMA_API_URL,
+  apiKey: process.env.ORAMA_API_KEY,
   userContext: "The user is looking for documentation help",
   inferenceType: "documentation"
 });
@@ -38,12 +38,39 @@ export default function Chat() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const { text } = await generateText({
-      model: orama.ask(),
-      prompt: input
-    });
+    setMessages(prev => [...prev, 
+      { role: 'user', content: input },
+      { role: 'assistant', content: '' }
+    ]);
 
-    setMessages(prev => [...prev, { role: 'assistant', content: text }]);
+    try {
+      const response = await streamText({
+        model: provider.ask(),
+        prompt: input,
+        temperature: 0
+      });
+
+      let previousLength = 0;
+      for await (const chunk of response.textStream) {
+        if (chunk) {
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const lastMessage = newMessages[newMessages.length - 1];
+            const currentChunk = chunk.toString();
+            const newText = currentChunk.slice(previousLength);
+            previousLength = currentChunk.length;
+            lastMessage.content += newText;
+            return newMessages;
+          });
+        }
+      }
+    } catch (error) {
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1].content = 'An error occurred while processing your request.';
+        return newMessages;
+      });
+    }
   };
 
   return (
@@ -56,11 +83,11 @@ export default function Chat() {
 
 ### Provider Configuration
 
-```js
+```typescript
 interface OramaProviderConfig {
   endpoint: string;    // Your Orama endpoint URL
   apiKey: string;      // Your Orama API key
-  userContext?: string | Record<string, any>; // Context for the chat session
+  userContext?: string; // Context for the chat session
   inferenceType?: "documentation" | "chat";   // Type of inference
   searchMode?: "fulltext" | "vector" | "hybrid"; // Search mode
   searchOptions?: OramaSearchOptions;         // Default search options
@@ -69,7 +96,7 @@ interface OramaProviderConfig {
 
 ### Search Options
 
-```js
+```typescript
 interface OramaSearchOptions {
   mode?: "fulltext" | "vector" | "hybrid";
   where?: Record<string, any>;
@@ -84,28 +111,35 @@ interface OramaSearchOptions {
 
 ## Usage Examples
 
-### Chat/QA Mode
+### Chat Mode with Streaming
 
 ```js
-const orama = oramaProvider({
-  endpoint: process.env.ORAMA_API_URL!,
-  apiKey: process.env.ORAMA_API_KEY!,
+const provider = oramaProvider({
+  endpoint: process.env.ORAMA_API_URL,
+  apiKey: process.env.ORAMA_API_KEY,
+  userContext: "The user is looking for documentation help",
   inferenceType: "documentation"
 });
 
-const { text } = await generateText({
-  model: orama.ask(),
-  prompt: "What is Orama?"
+const response = await streamText({
+  model: provider.ask(),
+  prompt: "What is Orama?",
+  temperature: 0
 });
+
+for await (const chunk of response.textStream) {
+  // Handle streaming chunks
+  console.log(chunk);
+}
 ```
 
 ### Search Mode
 
 ```js
-const orama = oramaProvider({
-  endpoint: process.env.ORAMA_API_URL!,
-  apiKey: process.env.ORAMA_API_KEY!,
-  searchMode: "hybrid",
+const provider = oramaProvider({
+  endpoint: process.env.ORAMA_API_URL,
+  apiKey: process.env.ORAMA_API_KEY,
+  searchMode: "fulltext",
   searchOptions: {
     sortBy: [{ property: "rating", order: "desc" }],
     where: {
@@ -114,12 +148,46 @@ const orama = oramaProvider({
   }
 });
 
-const { text } = await generateText({
-  model: orama.ask(),
+const response = await generateText({
+  model: provider.ask(),
   prompt: "Search query"
 });
+
+// Response will include:
+// - text: formatted search results
+// - results: array of documents with their scores
+// - finishReason: 'stop'
+// - usage: token usage statistics
 ```
 
+### Search Results Structure
+
+Search results are returned with the following structure:
+
+```typescript
+interface SearchResult {
+  text: string;
+  results: Array<{
+    document: {
+      title?: string;
+      description?: string;
+      image?: string;
+      url?: string;
+      releaseDate?: string;
+      rating?: string;
+      genres?: string[];
+      // ... other document fields
+    };
+    score: number;
+  }>;
+  finishReason: string;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+```
 
 ## Contributing
 
