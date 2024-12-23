@@ -1,6 +1,6 @@
 import { OramaClient } from "@oramacloud/client";
 import type { OramaProviderConfig, SearchResponse, SearchHit, SearchResult } from './types';
-
+import { LanguageModelV1 } from '@ai-sdk/provider'
 export class OramaService {
   readonly client: OramaClient;
   readonly config: OramaProviderConfig;
@@ -13,10 +13,24 @@ export class OramaService {
     this.config = config;
   }
 
-  ask() {
+  ask(): LanguageModelV1 {
     const self = this;
     return {
-      doGenerate: async (prompt: any) => {
+      specificationVersion: "v1" as const,
+      provider: "orama" as const,
+      modelId: "orama-default" as const,
+      defaultObjectGenerationMode: "json" as const,
+      doGenerate: async (prompt: any): Promise<{
+        text: string;
+        finishReason: 'stop';
+        usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+        toolCalls?: any[];
+        functionCall?: any;
+        logprobs?: any;
+        systemFingerprint?: string;
+        choices: any[];
+        rawCall: any;
+      }> => {
         const promptText = prompt.prompt?.[0]?.content?.[0]?.text || prompt;
         
         if (this.config.searchMode) {
@@ -30,14 +44,19 @@ export class OramaService {
             if (!results?.hits?.length) {
               return {
                 text: 'No results found.',
-                results: [],
-                finishReason: 'stop',
+                finishReason: 'stop' as const,
                 usage: {
                   promptTokens: promptText.length,
                   completionTokens: 'No results found.'.length,
                   totalTokens: promptText.length + 'No results found.'.length
-                }
-              } as SearchResult;
+                },
+                toolCalls: undefined,
+                functionCall: undefined,
+                logprobs: undefined,
+                systemFingerprint: undefined,
+                choices: [],
+                rawCall: {}
+              };
             }
 
             const searchResults = results.hits.map((hit: SearchHit) => ({
@@ -55,19 +74,40 @@ export class OramaService {
 
             return {
               text: formattedText,
-              results: searchResults,
-              finishReason: 'stop',
+              finishReason: 'stop' as const,
               usage: {
                 promptTokens: promptText.length,
                 completionTokens: formattedText.length,
                 totalTokens: promptText.length + formattedText.length
-              }
-            } as SearchResult;
+              },
+              toolCalls: undefined,
+              functionCall: undefined,
+              logprobs: undefined,
+              systemFingerprint: undefined,
+              choices: [],
+              rawCall: {}
+            };
           } catch (error) {
             console.error('Search error:', error);
             throw error;
           }
         }
+
+        return {
+          text: '',
+          finishReason: 'stop' as const,
+          usage: {
+            promptTokens: promptText.length,
+            completionTokens: 0,
+            totalTokens: promptText.length
+          },
+          toolCalls: undefined,
+          functionCall: undefined,
+          logprobs: undefined,
+          systemFingerprint: undefined,
+          choices: [],
+          rawCall: {}
+        };
       },
       doStream: async (prompt: any) => {
         const promptText = prompt.prompt?.[0]?.content?.[0]?.text || prompt;
@@ -116,17 +156,13 @@ export class OramaService {
 
           return {
             stream,
-            response: Promise.resolve({
-              id: 'orama-response',
-              created: Date.now(),
-              model: 'orama',
-              usage: {
-                promptTokens: promptText.length,
-                completionTokens: 0,
-                totalTokens: promptText.length
-              }
-            }),
-            data: Promise.resolve({ id: 'orama-data' })
+            rawCall: {
+              rawPrompt: promptText,
+              rawSettings: {} as Record<string, unknown>
+            },
+            rawResponse: {
+              headers: {}
+            }
           };
         } catch (error) {
           console.error('Orama streaming error:', error);

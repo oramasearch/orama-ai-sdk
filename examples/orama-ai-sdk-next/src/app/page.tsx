@@ -77,7 +77,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const inputRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [currentStreamingMessage, setCurrentStreamingMessage] = useState('');
@@ -150,9 +150,9 @@ export default function Home() {
           prompt: input
         });
   
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          results: activeTab === 'search' ? parseResults(response.text) : null
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          results: activeTab === 'search' ? parseResults(response.text) : undefined
         }]);
       }
     } catch (error) {
