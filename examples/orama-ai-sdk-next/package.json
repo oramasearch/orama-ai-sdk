@@ -6,12 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "postinstall": "npm install ../../",
-    "link-provider": "npm link ../../"
+    "lint": "next lint"
   },
   "dependencies": {
-    "@oramacloud/ai-sdk-provider": "^0.1.0",
+    "@oramacloud/ai-sdk-provider": "^0.1.1",
     "@oramacloud/client": "^1.0.0",
     "@radix-ui/react-slot": "^1.1.0",
     "ai": "^4.0.9",
