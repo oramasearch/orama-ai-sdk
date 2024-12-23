@@ -8,6 +8,9 @@
   "files": [
     "dist"
   ],
+  "workspaces": [
+    "examples"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
