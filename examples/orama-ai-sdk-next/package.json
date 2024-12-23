@@ -2,9 +2,6 @@
   "name": "orama-ai-sdk-next",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,7 +11,7 @@
     "link-provider": "npm link ../../"
   },
   "dependencies": {
-    "@oramacloud/ai-sdk-provider": "file:../..",
+    "@oramacloud/ai-sdk-provider": "^0.1.0",
     "@oramacloud/client": "^1.0.0",
     "@radix-ui/react-slot": "^1.1.0",
     "ai": "^4.0.9",
