@@ -5,6 +5,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 
+interface Message {
+  role: 'user' | 'assistant';
+  content?: string;
+  results?: {
+    hits: Array<{
+      document: Record<string, any>;
+    }>;
+  };
+}
+
 const ResultCard = ({ document }: { document: Record<string, any> }) => {
   return (
     <div className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm">
@@ -64,11 +74,11 @@ const ResultCard = ({ document }: { document: Record<string, any> }) => {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'chat' | 'search'>('chat');
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef(null);
-  const messagesEndRef = useRef(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [currentStreamingMessage, setCurrentStreamingMessage] = useState('');
   const scrollToBottom = () => {
@@ -92,8 +102,8 @@ export default function Home() {
   
     try {
       const provider = oramaProvider({
-        endpoint: process.env.NEXT_PUBLIC_ORAMA_API_URL,
-        apiKey: process.env.NEXT_PUBLIC_ORAMA_API_KEY,
+        endpoint: process.env.NEXT_PUBLIC_ORAMA_API_URL as string,
+        apiKey: process.env.NEXT_PUBLIC_ORAMA_API_KEY as string,
         userContext: "The user is looking for documentation help",
         inferenceType: "documentation",
         ...(activeTab === 'search' && {
@@ -211,6 +221,7 @@ export default function Home() {
                 )}
               </div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
         </CardContent>
       </Card>
