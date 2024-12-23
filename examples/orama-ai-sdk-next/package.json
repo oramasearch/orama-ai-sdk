@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@oramacloud/ai-sdk-provider": "^0.1.1",
+    "@oramacloud/ai-sdk-provider": "^0.1.2",
     "@oramacloud/client": "^1.0.0",
     "@radix-ui/react-slot": "^1.1.0",
     "ai": "^4.0.9",
