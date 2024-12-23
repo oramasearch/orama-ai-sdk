@@ -13,14 +13,14 @@ A provider for [Vercel's AI SDK](https://sdk.vercel.ai/docs) that enables seamle
 ## Installation
 
 ```
-npm install @orama/ai-sdk-provider
+npm install @oramacloud/ai-sdk-provider
 ```
 
 ## Quick Start
 
 ```jsx
 import { generateText, streamText } from 'ai';
-import { oramaProvider } from '@orama/ai-sdk-provider';
+import { oramaProvider } from '@oramacloud/ai-sdk-provider';
 
 // Create an Orama provider instance
 const provider = oramaProvider({
