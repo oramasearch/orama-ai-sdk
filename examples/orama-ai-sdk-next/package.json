@@ -14,10 +14,10 @@
     "link-provider": "npm link ../../"
   },
   "dependencies": {
+    "@oramacloud/ai-sdk-provider": "file:../..",
     "@oramacloud/client": "^1.0.0",
     "@radix-ui/react-slot": "^1.1.0",
     "ai": "^4.0.9",
-    "@orama/ai-sdk-provider": "*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.461.0",
