@@ -95,7 +95,9 @@ export default function Home() {
   
     setMessages(prev => [...prev, { role: 'user', content: input }]);
     
-    setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+    if (activeTab === 'chat') {
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+    }
     
     setInput('');
     setIsLoading(true);
@@ -138,11 +140,10 @@ export default function Home() {
           }
         } catch (streamError) {
           console.error('Streaming error:', streamError);
-          setMessages(prev => {
-            const newMessages = [...prev];
-            newMessages[newMessages.length - 1].content = 'Sorry, there was an error processing your request.';
-            return newMessages;
-          });
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: 'Sorry, there was an error processing your request.' 
+          }]);
         }
       } else {
         const response = await generateText({
@@ -152,15 +153,14 @@ export default function Home() {
   
         setMessages(prev => [...prev, {
           role: 'assistant',
-          results: activeTab === 'search' ? parseResults(response.text) : undefined
+          results: parseResults(response.text)
         }]);
       }
     } catch (error) {
-      setMessages(prev => {
-        const newMessages = [...prev];
-        newMessages[newMessages.length - 1].content = 'An error occurred while processing your request.';
-        return newMessages;
-      });
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'An error occurred while processing your request.' 
+      }]);
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
