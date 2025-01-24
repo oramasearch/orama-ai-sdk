@@ -8,7 +8,6 @@ A provider for [Vercel's AI SDK](https://sdk.vercel.ai/docs) that enables seamle
 - 💬 Streaming chat/QA functionality
 - 🚀 Framework agnostic
 - 🔄 Real-time streaming responses
-- 🖼️ Rich media search results
 
 ## Installation
 
@@ -16,82 +15,22 @@ A provider for [Vercel's AI SDK](https://sdk.vercel.ai/docs) that enables seamle
 npm install @oramacloud/ai-sdk-provider
 ```
 
-## Quick Start
+## Usage
 
-```jsx
-import { generateText, streamText } from 'ai';
-import { oramaProvider } from '@oramacloud/ai-sdk-provider';
-
-// Create an Orama provider instance
-const provider = oramaProvider({
-  endpoint: process.env.ORAMA_API_URL,
-  apiKey: process.env.ORAMA_API_KEY,
-  userContext: "The user is looking for documentation help",
-  inferenceType: "documentation"
-});
-
-// Use it in your component
-export default function Chat() {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    setMessages(prev => [...prev, 
-      { role: 'user', content: input },
-      { role: 'assistant', content: '' }
-    ]);
-
-    try {
-      const response = await streamText({
-        model: provider.ask(),
-        prompt: input,
-        temperature: 0
-      });
-
-      let previousLength = 0;
-      for await (const chunk of response.textStream) {
-        if (chunk) {
-          setMessages(prev => {
-            const newMessages = [...prev];
-            const lastMessage = newMessages[newMessages.length - 1];
-            const currentChunk = chunk.toString();
-            const newText = currentChunk.slice(previousLength);
-            previousLength = currentChunk.length;
-            lastMessage.content += newText;
-            return newMessages;
-          });
-        }
-      }
-    } catch (error) {
-      setMessages(prev => {
-        const newMessages = [...prev];
-        newMessages[newMessages.length - 1].content = 'An error occurred while processing your request.';
-        return newMessages;
-      });
-    }
-  };
-
-  return (
-    // Your chat UI
-  );
-}
-```
-
-## Configuration
-
-### Provider Configuration
+### Configuration
 
 ```typescript
-interface OramaProviderConfig {
-  endpoint: string;    // Your Orama endpoint URL
-  apiKey: string;      // Your Orama API key
-  userContext?: string; // Context for the chat session
-  inferenceType?: "documentation" | "chat";   // Type of inference
-  searchMode?: "fulltext" | "vector" | "hybrid"; // Search mode
-  searchOptions?: OramaSearchOptions;         // Default search options
-}
+// Create an Orama provider instance
+const provider = oramaProvider({
+  // Required configurations
+  endpoint: process.env.ORAMA_API_URL,
+  apiKey: process.env.ORAMA_API_KEY,
+  // Optional configurations
+  userContext?: string | Record<string, any>;  // Context for QA sessions
+  inferenceType?: "documentation";  // Currently only supports "documentation"
+  searchMode?: "fulltext" | "vector" | "hybrid";  // Default: "fulltext"
+  searchOptions?: OramaSearchOptions;  // Additional search parameters
+})
 ```
 
 ### Search Options
@@ -107,86 +46,29 @@ interface OramaSearchOptions {
   order?: "asc" | "desc";
 }
 ```
-
-
-## Usage Examples
-
-### Chat Mode with Streaming
-
-```js
-const provider = oramaProvider({
-  endpoint: process.env.ORAMA_API_URL,
-  apiKey: process.env.ORAMA_API_KEY,
-  userContext: "The user is looking for documentation help",
-  inferenceType: "documentation"
-});
-
-const response = await streamText({
-  model: provider.ask(),
-  prompt: "What is Orama?",
-  temperature: 0
-});
-
-for await (const chunk of response.textStream) {
-  // Handle streaming chunks
-  console.log(chunk);
-}
-```
-
-### Search Mode
-
-```js
-const provider = oramaProvider({
-  endpoint: process.env.ORAMA_API_URL,
-  apiKey: process.env.ORAMA_API_KEY,
-  searchMode: "fulltext",
-  searchOptions: {
-    sortBy: [{ property: "rating", order: "desc" }],
-    where: {
-      category: "documentation"
-    }
-  }
-});
-
-const response = await generateText({
-  model: provider.ask(),
-  prompt: "Search query"
-});
-
-// Response will include:
-// - text: formatted search results
-// - results: array of documents with their scores
-// - finishReason: 'stop'
-// - usage: token usage statistics
-```
-
-### Search Results Structure
-
-Search results are returned with the following structure:
+### Chat/QA Usage
 
 ```typescript
-interface SearchResult {
-  text: string;
-  results: Array<{
-    document: {
-      title?: string;
-      description?: string;
-      image?: string;
-      url?: string;
-      releaseDate?: string;
-      rating?: string;
-      genres?: string[];
-      // ... other document fields
-    };
-    score: number;
-  }>;
-  finishReason: string;
-  usage: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-}
+import { streamText } from 'ai';
+const response = await streamText({
+  model: provider.ask(),
+  messages: [{ 
+    role: 'user', 
+    content: 'What is vector search?' 
+  }]
+});
+```
+
+### Search Usage
+
+```typescript
+const response = await generateText({
+  model: provider.search(),
+  messages: [{ 
+    role: 'user', 
+    content: 'vector search documentation' 
+  }]
+});
 ```
 
 ## Contributing
