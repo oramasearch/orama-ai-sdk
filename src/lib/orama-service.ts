@@ -1,6 +1,7 @@
-import { OramaClient } from "@oramacloud/client";
-import type { OramaProviderConfig, SearchResponse, SearchHit, SearchResult } from './types';
-import { LanguageModelV1 } from '@ai-sdk/provider'
+import { LanguageModelV1, LanguageModelV1CallOptions, LanguageModelV1FinishReason, LanguageModelV1StreamPart } from '@ai-sdk/provider';
+import { OramaClient } from '@oramacloud/client';
+import type { OramaProviderConfig, SearchResponse, SearchHit, OramaAnswer } from './types';
+
 export class OramaService {
   readonly client: OramaClient;
   readonly config: OramaProviderConfig;
@@ -18,100 +19,101 @@ export class OramaService {
     return {
       specificationVersion: "v1" as const,
       provider: "orama" as const,
-      modelId: "orama-default" as const,
+      modelId: "orama-qa" as const,
       defaultObjectGenerationMode: "json" as const,
-      doGenerate: async (prompt: any): Promise<{
-        text: string;
-        finishReason: 'stop';
-        usage: { promptTokens: number; completionTokens: number; totalTokens: number };
-        toolCalls?: any[];
-        functionCall?: any;
-        logprobs?: any;
-        systemFingerprint?: string;
-        choices: any[];
-        rawCall: any;
-      }> => {
-        const promptText = prompt.prompt?.[0]?.content?.[0]?.text || prompt;
-        
-        if (this.config.searchMode) {
-          try {
-            const results = await self.client.search({
-              term: promptText,
-              mode: this.config.searchMode,
-              ...this.config.searchOptions
-            }) as SearchResponse;
+      supportsImageUrls: false,
+      
+      async doGenerate(options: LanguageModelV1CallOptions) {
+        const promptText = self.extractPromptText(options);
+        const answerSession = self.client.createAnswerSession({
+          userContext: self.config.userContext,
+          inferenceType: self.config.inferenceType || 'documentation',
+        });
 
-            if (!results?.hits?.length) {
-              return {
-                text: 'No results found.',
-                finishReason: 'stop' as const,
-                usage: {
-                  promptTokens: promptText.length,
-                  completionTokens: 'No results found.'.length,
-                  totalTokens: promptText.length + 'No results found.'.length
-                },
-                toolCalls: undefined,
-                functionCall: undefined,
-                logprobs: undefined,
-                systemFingerprint: undefined,
-                choices: [],
-                rawCall: {}
-              };
-            }
+        try {
+          const answer = await answerSession.ask({
+            term: promptText
+          }) as string | OramaAnswer;
 
-            const searchResults = results.hits.map((hit: SearchHit) => ({
-              document: hit.document,
-              score: hit.score
-            }));
-
-            const formattedText = searchResults
-              .map((result) => {
-                return Object.entries(result.document)
-                  .map(([key, value]) => `${key}: ${value}`)
-                  .join('\n');
-              })
-              .join('\n\n');
-
+          if (typeof answer === 'string') {
             return {
-              text: formattedText,
-              finishReason: 'stop' as const,
+              text: answer,
+              finishReason: 'stop' as LanguageModelV1FinishReason,
               usage: {
                 promptTokens: promptText.length,
-                completionTokens: formattedText.length,
-                totalTokens: promptText.length + formattedText.length
+                completionTokens: answer.length,
+              },
+              rawCall: {
+                rawPrompt: promptText,
+                rawSettings: Object.entries(self.config).reduce((acc, [key, value]) => {
+                  acc[key] = value;
+                  return acc;
+                }, {} as Record<string, unknown>)
+              },
+              rawResponse: {
+                headers: {}
+              },
+              response: {
+                id: crypto.randomUUID(),
+                timestamp: new Date(),
+                modelId: "orama-qa"
               },
               toolCalls: undefined,
-              functionCall: undefined,
+              warnings: undefined,
+              providerMetadata: undefined,
               logprobs: undefined,
-              systemFingerprint: undefined,
-              choices: [],
-              rawCall: {}
+              request: {
+                body: JSON.stringify({
+                  term: promptText,
+                  userContext: self.config.userContext,
+                  inferenceType: self.config.inferenceType
+                })
+              }
             };
-          } catch (error) {
-            console.error('Search error:', error);
-            throw error;
           }
-        }
 
-        return {
-          text: '',
-          finishReason: 'stop' as const,
-          usage: {
-            promptTokens: promptText.length,
-            completionTokens: 0,
-            totalTokens: promptText.length
-          },
-          toolCalls: undefined,
-          functionCall: undefined,
-          logprobs: undefined,
-          systemFingerprint: undefined,
-          choices: [],
-          rawCall: {}
-        };
+          return {
+            text: answer.text || '',
+            finishReason: 'stop' as LanguageModelV1FinishReason,
+            usage: {
+              promptTokens: promptText.length,
+              completionTokens: (answer.text || '').length,
+            },
+            rawCall: {
+              rawPrompt: promptText,
+              rawSettings: Object.entries(self.config).reduce((acc, [key, value]) => {
+                acc[key] = value;
+                return acc;
+              }, {} as Record<string, unknown>)
+            },
+            rawResponse: {
+              headers: {}
+            },
+            response: {
+              id: crypto.randomUUID(),
+              timestamp: new Date(),
+              modelId: "orama-qa"
+            },
+            toolCalls: undefined,
+            warnings: undefined,
+            providerMetadata: undefined,
+            logprobs: undefined,
+            request: {
+              body: JSON.stringify({
+                term: promptText,
+                userContext: self.config.userContext,
+                inferenceType: self.config.inferenceType
+              })
+            }
+          };
+        } catch (error) {
+          console.error('Orama QA error:', error);
+          throw error;
+        }
       },
-      doStream: async (prompt: any) => {
-        const promptText = prompt.prompt?.[0]?.content?.[0]?.text || prompt;
-        
+
+      async doStream(options: LanguageModelV1CallOptions) {
+        const promptText = self.extractPromptText(options);
         const answerSession = self.client.createAnswerSession({
           userContext: self.config.userContext,
           inferenceType: self.config.inferenceType || 'documentation',
@@ -122,7 +124,7 @@ export class OramaService {
             term: promptText
           });
 
-          const stream = new ReadableStream({
+          const stream = new ReadableStream<LanguageModelV1StreamPart>({
             async start(controller) {
               try {
                 for await (const chunk of oramaStream) {
@@ -139,12 +141,10 @@ export class OramaService {
                   usage: {
                     promptTokens: promptText.length,
                     completionTokens: 0,
-                    totalTokens: promptText.length
                   }
                 });
                 controller.close();
               } catch (error) {
-                console.error('Stream processing error:', error);
                 controller.enqueue({
                   type: 'error',
                   error
@@ -158,7 +158,10 @@ export class OramaService {
             stream,
             rawCall: {
               rawPrompt: promptText,
-              rawSettings: {} as Record<string, unknown>
+              rawSettings: Object.entries(self.config).reduce((acc, [key, value]) => {
+                acc[key] = value;
+                return acc;
+              }, {} as Record<string, unknown>)
             },
             rawResponse: {
               headers: {}
@@ -170,5 +173,118 @@ export class OramaService {
         }
       }
     };
+  }
+
+  search(): LanguageModelV1 {
+    const self = this;
+    return {
+      specificationVersion: "v1" as const,
+      provider: "orama" as const,
+      modelId: "orama-search" as const,
+      defaultObjectGenerationMode: "json" as const,
+      supportsImageUrls: false,
+
+      async doGenerate(options: LanguageModelV1CallOptions) {
+        const promptText = self.extractPromptText(options);
+        
+        try {
+          const results = await self.client.search({
+            term: promptText,
+            mode: self.config.searchMode || 'fulltext',
+            ...self.config.searchOptions
+          }) as SearchResponse;
+
+          const formattedResults = self.formatSearchResults(results.hits);
+
+          return {
+            text: formattedResults,
+            finishReason: 'stop' as LanguageModelV1FinishReason,
+            usage: {
+              promptTokens: promptText.length,
+              completionTokens: formattedResults.length,
+            },
+            rawCall: {
+              rawPrompt: promptText,
+              rawSettings: self.config.searchOptions || {}
+            },
+            rawResponse: {
+              headers: {}
+            },
+            response: {
+              id: crypto.randomUUID(),
+              timestamp: new Date(),
+              modelId: "orama-search"
+            }
+          };
+        } catch (error) {
+          console.error('Search error:', error);
+          throw error;
+        }
+      },
+
+      async doStream(options: LanguageModelV1CallOptions) {
+        const results = await this.doGenerate(options);
+        
+        const stream = new ReadableStream<LanguageModelV1StreamPart>({
+          start(controller) {
+            if (results.text) {
+              controller.enqueue({
+                type: 'text-delta',
+                textDelta: results.text
+              });
+            }
+            
+            controller.enqueue({
+              type: 'finish',
+              finishReason: results.finishReason,
+              usage: results.usage
+            });
+            
+            controller.close();
+          }
+        });
+
+        return {
+          stream,
+          rawCall: {
+            rawPrompt: self.extractPromptText(options),
+            rawSettings: self.config.searchOptions || {}
+          },
+          rawResponse: {
+            headers: {}
+          }
+        };
+      }
+    };
+  }
+
+  private extractPromptText(options: LanguageModelV1CallOptions): string {
+    if (!options.prompt?.[0]?.content?.[0]) {
+      return '';
+    }
+    
+    const content = options.prompt[0].content[0];
+    if (typeof content === 'string') {
+      return content;
+    }
+    
+    if ('text' in content) {
+      return content.text as string;
+    }
+    
+    return '';
+  }
+
+  private formatSearchResults(hits: SearchHit[]): string {
+    if (!hits.length) return 'No results found.';
+    
+    return hits
+      .map(hit => {
+        return Object.entries(hit.document)
+          .filter(([_, value]) => value != null)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join('\n');
+      })
+      .join('\n\n');
   }
 }

@@ -1,5 +1,3 @@
-
-
 export interface OramaProviderConfig {
   endpoint: string;
   apiKey: string;
@@ -52,4 +50,8 @@ export interface OramaSearchOptions {
 
 export interface OramaStreamResponse extends OramaMessage {
   createdAt: Date;
+}
+
+export interface OramaAnswer {
+  text: string;
 }

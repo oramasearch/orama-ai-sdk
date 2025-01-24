@@ -79,29 +79,25 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageContentRef = useRef<HTMLDivElement>(null);
 
-  const [currentStreamingMessage, setCurrentStreamingMessage] = useState('');
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, currentStreamingMessage])
+  }, [messages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
-  
-    setMessages(prev => [...prev, { role: 'user', content: input }]);
-    
-    if (activeTab === 'chat') {
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-    }
-    
+
+    const userInput = input;
+    setMessages(prev => [...prev, { role: 'user', content: userInput }]);
     setInput('');
     setIsLoading(true);
-  
+
     try {
       const provider = oramaProvider({
         endpoint: process.env.NEXT_PUBLIC_ORAMA_API_URL as string,
@@ -115,51 +111,41 @@ export default function Home() {
           }
         })
       });
-  
+
       if (activeTab === 'chat') {
-        try {
-          const response = await streamText({
-            model: provider.ask(),
-            prompt: input,
-            temperature: 0
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+        
+        const response = await streamText({
+          model: provider.ask(),
+          prompt: userInput
+        });
+
+        let content = '';
+        for await (const chunk of response.textStream) {
+          content = chunk;
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1].content = content;
+            return newMessages;
           });
-  
-          let previousLength = 0;
-          for await (const chunk of response.textStream) {
-            if (chunk) {
-              setMessages(prev => {
-                const newMessages = [...prev];
-                const lastMessage = newMessages[newMessages.length - 1];
-                const currentChunk = chunk.toString();
-                const newText = currentChunk.slice(previousLength);
-                previousLength = currentChunk.length;
-                lastMessage.content += newText;
-                return newMessages;
-              });
-            }
-          }
-        } catch (streamError) {
-          console.error('Streaming error:', streamError);
-          setMessages(prev => [...prev, { 
-            role: 'assistant', 
-            content: 'Sorry, there was an error processing your request.' 
-          }]);
         }
       } else {
         const response = await generateText({
-          model: provider.ask(),
-          prompt: input
+          model: provider.search(),
+          prompt: userInput
         });
-  
+
+        const results = parseResults(response.text);
         setMessages(prev => [...prev, {
           role: 'assistant',
-          results: parseResults(response.text)
+          results: { hits: results }
         }]);
       }
     } catch (error) {
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'An error occurred while processing your request.' 
+      console.error('Error:', error);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'An error occurred while processing your request.'
       }]);
     } finally {
       setIsLoading(false);
@@ -168,15 +154,25 @@ export default function Home() {
   };
 
   const parseResults = (text: string) => {
-    const entries = text.split('\n\n').map(entry => {
+    if (!text) return [];
+    
+    return text.split('\n\n').map(entry => {
       const fields = entry.split('\n').reduce((acc, line) => {
         const [key, value] = line.split(': ');
-        acc[key] = value;
+        if (key && value) {
+          // Handle special fields that need parsing
+          if (key === 'genres' && value.includes(',')) {
+            acc[key] = value.split(',').map(g => g.trim());
+          } else if (key === 'releaseDate' && !isNaN(Date.parse(value))) {
+            acc[key] = new Date(value).toISOString();
+          } else {
+            acc[key] = value;
+          }
+        }
         return acc;
-      }, {} as Record<string, string>);
+      }, {} as Record<string, any>);
       return { document: fields };
     });
-    return { hits: entries };
   };
 
   return (
@@ -208,7 +204,10 @@ export default function Home() {
                   {message.role === 'assistant' ? 'Assistant' : 'You'}
                 </div>
                 {message.content && (
-                  <div className="text-gray-600 whitespace-pre-wrap mb-4">
+                  <div 
+                    className="text-gray-600 whitespace-pre-wrap mb-4"
+                    ref={index === messages.length - 1 ? messageContentRef : undefined}
+                  >
                     {message.content}
                   </div>
                 )}

@@ -22,6 +22,6 @@
   },
   "dependencies": {
     "@oramacloud/client": "^2.1.4",
-    "ai": "^4.0.10"
+    "ai": "^4.1.5"
   }
 }
